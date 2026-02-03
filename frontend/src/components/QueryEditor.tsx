@@ -9,8 +9,6 @@ import { DBQuery, DBGetTables, DBGetAllColumns, DBGetDatabases, DBGetColumns } f
 import DataGrid, { GONAVI_ROW_KEY } from './DataGrid';
 
 const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
-  const [query, setQuery] = useState(tab.query || 'SELECT * FROM ');
-  
   // DataGrid State
   const [results, setResults] = useState<any[]>([]);
   const [columnNames, setColumnNames] = useState<string[]>([]);
@@ -39,6 +37,19 @@ const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
   const darkMode = useStore(state => state.darkMode);
   const sqlFormatOptions = useStore(state => state.sqlFormatOptions);
   const setSqlFormatOptions = useStore(state => state.setSqlFormatOptions);
+
+  const getQuery = (): string => {
+    return editorRef.current?.getValue();
+  }
+
+  const getSelectedQuery = (): string => {
+    const selection = editorRef.current?.getSelection();
+    return editorRef.current?.getModel().getValueInRange(selection);
+  }
+
+  const setQuery = (query: string): void => {
+    editorRef.current?.setValue(query);
+  }
 
   // If opening a saved query, load its SQL
   useEffect(() => {
@@ -188,7 +199,7 @@ const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
 
   const handleFormat = () => {
       try {
-          const formatted = format(query, { language: 'mysql', keywordCase: sqlFormatOptions.keywordCase });
+          const formatted = format(getQuery(), { language: 'mysql', keywordCase: sqlFormatOptions.keywordCase });
           setQuery(formatted);
       } catch (e) {
           message.error("格式化失败: SQL 语法可能有误");
@@ -211,6 +222,10 @@ const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
   ];
 
   const handleRun = async () => {
+    // handle selected query execution first
+    let selected = getSelectedQuery().trim();
+    let query = selected || getQuery().trim();
+
     if (!query.trim()) return;
     if (!currentDb) {
         message.error("请先选择数据库");
@@ -311,7 +326,7 @@ const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
           saveQuery({
               id: tab.id.startsWith('saved-') ? tab.id : `saved-${Date.now()}`,
               name: values.name,
-              sql: query,
+              sql: getQuery(),
               connectionId: currentConnectionId,
               dbName: currentDb || tab.dbName || '',
               createdAt: Date.now()
@@ -368,9 +383,8 @@ const QueryEditor: React.FC<{ tab: TabData }> = ({ tab }) => {
         <Editor 
           height="100%" 
           defaultLanguage="sql" 
+          defaultValue='SELECT * FROM '
           theme={darkMode ? "vs-dark" : "light"}
-          value={query} 
-          onChange={(val) => setQuery(val || '')}
           onMount={handleEditorDidMount}
           options={{ 
             minimap: { enabled: false }, 
